@@ -84,7 +84,18 @@ docker run --gpus all --ipc=host --rm -it \
 cd /workspace/artifixer
 ```
 
-Download the release checkpoint from the [ArtiFixer Hugging Face repo](https://huggingface.co/nvidia/ArtiFixer):
+Download a release checkpoint from the [ArtiFixer Hugging Face repo](https://huggingface.co/nvidia/ArtiFixer). Two variants are available:
+
+| Checkpoint | Base model | Parameters | Notes |
+| --- | --- | --- | --- |
+| `artifixer-14b.pt` | `Wan-AI/Wan2.1-T2V-14B-Diffusers` | ~16.9B | Highest quality |
+| `artifixer-1.3b.pt` | `Wan-AI/Wan2.1-T2V-1.3B-Diffusers` | ~1.68B | Faster and lighter; fits comfortably on a single 80 GB GPU for all workflows |
+
+The checkpoint stores only transformer weights, so every inference and
+evaluation command must be told which base model to build via `--model_id`
+(the default is the 14B base; loading the 1.3B checkpoint without it fails
+with shape mismatches). The commands below pass `--model_id "$MODEL_ID"`
+throughout, so export both variables together:
 
 ```bash
 mkdir -p /data/artifixer-checkpoints
@@ -93,6 +104,18 @@ huggingface-cli download nvidia/ArtiFixer \
     --local-dir /data/artifixer-checkpoints
 
 export CHECKPOINT_PT=/data/artifixer-checkpoints/artifixer-14b.pt
+export MODEL_ID=Wan-AI/Wan2.1-T2V-14B-Diffusers
+```
+
+or, for the 1.3B variant:
+
+```bash
+huggingface-cli download nvidia/ArtiFixer \
+    artifixer-1.3b.pt \
+    --local-dir /data/artifixer-checkpoints
+
+export CHECKPOINT_PT=/data/artifixer-checkpoints/artifixer-1.3b.pt
+export MODEL_ID=Wan-AI/Wan2.1-T2V-1.3B-Diffusers
 ```
 
 ## Inference
@@ -193,6 +216,7 @@ export SAVE_DIR=/path/to/artifixer-corrected
 python -m model_eval.run_inference \
     --evalset reconstructed_colmap \
     --checkpoint_pt "$CHECKPOINT_PT" \
+    --model_id "$MODEL_ID" \
     --save_dir "$SAVE_DIR" \
     --split_path "$SCENE_ROOT/split.json" \
     --render_trajectory all_frames
@@ -206,6 +230,7 @@ export SCENE_ROOT=/path/to/artifixer-prep/my_scene_orbit_360
 python -m model_eval.run_inference \
     --evalset reconstructed_colmap \
     --checkpoint_pt "$CHECKPOINT_PT" \
+    --model_id "$MODEL_ID" \
     --save_dir "$SAVE_DIR" \
     --split_path "$SCENE_ROOT/split.json" \
     --render_trajectory trajectory
@@ -263,6 +288,7 @@ export RENDER_TRAJECTORY=all_frames  # use trajectory for a prepared novel-traje
 python -m model_eval.run_inference \
     --evalset reconstructed_colmap \
     --checkpoint_pt "$CHECKPOINT_PT" \
+    --model_id "$MODEL_ID" \
     --save_dir "$ARTIFIXER3D_PLUS_SAVE_DIR" \
     --split_path "$SCENE_ROOT/split_artifixer3d_plus.json" \
     --render_trajectory "$RENDER_TRAJECTORY"
@@ -362,7 +388,7 @@ ArtiFixer training has three stages:
 3. Stage 3 DMD distillation, using the stage 2 checkpoint as the student/generator initialization and the stage 1
    checkpoint as the critic initialization.
 
-The default model is Wan2.1 14B. Set `num_processes * gradient_accumulation_steps` to 128 for the default recipe; for example, use `--gradient_accumulation_steps 16` with 8 processes.
+The default model is Wan2.1 14B; pass `--model_id Wan-AI/Wan2.1-T2V-1.3B-Diffusers` to every stage to train the 1.3B variant instead. Set `num_processes * gradient_accumulation_steps` to 128 for the default recipe; for example, use `--gradient_accumulation_steps 16` with 8 processes.
 
 Launch stage 1 with `accelerate`:
 
@@ -450,6 +476,7 @@ DL3DV (our split):
 
 ```bash
 export CHECKPOINT_PT=/data/artifixer-checkpoints/artifixer-14b.pt
+export MODEL_ID=Wan-AI/Wan2.1-T2V-14B-Diffusers
 export SAVE_DIR=/path/to/artifixer-eval
 export SPLIT_PATH=/path/to/artifixer-data/trainval_test_split.json
 export DL3DV_ROOT=/path/to/DL3DV-ALL-960P
@@ -458,12 +485,17 @@ export PROMPT_ROOT=/path/to/artifixer-data/DL3DV-ALL-960P-captions
 python -m model_eval.run_inference \
     --evalset 3dgrut_dl3dv_ours \
     --checkpoint_pt "$CHECKPOINT_PT" \
+    --model_id "$MODEL_ID" \
     --save_dir "$SAVE_DIR" \
     --split_path "$SPLIT_PATH" \
     --dl3dv_dir "$DL3DV_ROOT" \
     --prompt_dir "$PROMPT_ROOT" \
     --save_frame_outputs_only
 ```
+
+The metric scripts locate outputs under a directory named after the checkpoint
+stem, so set it to match the checkpoint in use (`artifixer-14b` or
+`artifixer-1.3b`):
 
 ```bash
 export EVAL_OUTPUT_NAME=artifixer-14b
@@ -488,6 +520,7 @@ export DIFIX_VISIBILITY_MASKS_DIR=/path/to/difix-visibility-masks
 python -m model_eval.run_inference \
     --evalset 3dgrut_dl3dv_difix \
     --checkpoint_pt "$CHECKPOINT_PT" \
+    --model_id "$MODEL_ID" \
     --save_dir "$SAVE_DIR" \
     --split_path "$SPLIT_PATH" \
     --dl3dv_dir "$DL3DV_ROOT" \
@@ -521,6 +554,7 @@ export NERFBUSTERS_VISIBILITY_MASKS_DIR=/path/to/nerfbusters-visibility-masks
 python -m model_eval.run_inference \
     --evalset nerfbusters \
     --checkpoint_pt "$CHECKPOINT_PT" \
+    --model_id "$MODEL_ID" \
     --save_dir "$SAVE_DIR" \
     --nerfbusters_dir "$NERFBUSTERS_DIR" \
     --nerfbusters_recon_results_dir "$NERFBUSTERS_RECON_RESULTS_DIR" \
