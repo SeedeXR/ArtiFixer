@@ -30,10 +30,19 @@ services:
       SPLAT_API_RATE_LIMIT_PER_MINUTE: ${SPLAT_API_RATE_LIMIT_PER_MINUTE:-120}
       SPLAT_API_TRUSTED_HOSTS: ${SPLAT_API_TRUSTED_HOSTS:-*}
       HF_TOKEN: ${HF_TOKEN:-}
+    # Each mount takes either a named volume (the default) or an absolute host
+    # path. Point them at directories you already have to avoid re-downloading
+    # tens of gigabytes of weights:
+    #
+    #   SPLAT_API_HF_CACHE_VOLUME=/root/.cache/huggingface \
+    #   SPLAT_API_CHECKPOINT_VOLUME=/data/artifixer-checkpoints \
+    #   docker compose -f splat_api/docker-compose.yml up
+    #
+    # An existing HF cache also means SPLAT_API_AUTO_DOWNLOAD can stay 0.
     volumes:
-      - splat-data:/data/splat-api
-      - checkpoints:/data/artifixer-checkpoints
-      - hf-cache:/data/hf-cache
+      - ${SPLAT_API_DATA_VOLUME:-splat-data}:/data/splat-api
+      - ${SPLAT_API_CHECKPOINT_VOLUME:-checkpoints}:/data/artifixer-checkpoints
+      - ${SPLAT_API_HF_CACHE_VOLUME:-hf-cache}:/data/hf-cache
     # 3DGRUT and the diffusion pipeline use shared memory heavily for dataloader
     # workers; the 64 MB default causes bus errors under load.
     shm_size: "16gb"

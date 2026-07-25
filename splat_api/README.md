@@ -205,6 +205,41 @@ re-downloads tens of gigabytes and an air-gapped deployment is never surprised b
 python -m splat_api.tools.fetch_models --variant 1.3b --skip captioner --skip moge
 ```
 
+### Size the volumes first
+
+Everything lands in the mounted volumes, not in the image, so the image stays small but the volumes
+do not. Measured sizes for the 1.3B configuration:
+
+| Component | Size | Needed by |
+| --- | --- | --- |
+| `Qwen/Qwen3-VL-30B-A3B-Instruct` | 58 GB | `caption` phase (correction modes only) |
+| `Wan-AI/Wan2.1-T2V-1.3B-Diffusers` | 27 GB | ArtiFixer inference and caption embeddings |
+| `nvidia/ArtiFixer` `artifixer-1.3b.pt` | 6.3 GB | ArtiFixer inference |
+| `Ruicheng/moge-2-vitl-normal` | 1.3 GB | `scale` phase (correction modes only) |
+| **Total** | **~93 GB** | |
+
+Provision at least 150 GB for the weight volumes plus whatever the job outputs need. A
+`reconstruct`-only deployment needs none of it — that mode runs no captioning, no metric alignment
+and no ArtiFixer inference — so `--skip captioner --skip moge` cuts the download to ~33 GB, and
+skipping the checkpoint entirely cuts it to zero.
+
+The fetcher is idempotent: it skips a checkpoint that is already on disk and lets the Hugging Face
+cache short-circuit the rest, so a restart re-checks metadata rather than re-downloading.
+
+### Optional: bind an existing cache instead of downloading
+
+For local testing on a machine that already holds these weights, each mount also accepts an
+absolute host path in place of its named volume, which avoids a second copy:
+
+```bash
+SPLAT_API_HF_CACHE_VOLUME=/root/.cache/huggingface \
+SPLAT_API_CHECKPOINT_VOLUME=/data/artifixer-checkpoints \
+docker compose -f splat_api/docker-compose.yml up -d
+```
+
+Leave `SPLAT_API_AUTO_DOWNLOAD` at `0` in that case. The entrypoint still finds the checkpoint in
+the mounted directory and pairs it with the matching base model id.
+
 ## Tests
 
 ```bash

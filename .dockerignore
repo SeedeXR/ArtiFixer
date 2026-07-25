@@ -28,3 +28,42 @@ __pycache__/
 
 thirdparty/Difix3D/
 thirdparty/GEN3C/
+
+# splat_api: keep pipeline artifacts out of the build context. Without these, a
+# local test run's exports get sent to the daemon and baked into the image by
+# `COPY . /workspace/artifixer` — measured at 50 MB of splats and preview video
+# for a single scene.
+/splat_exports/
+/e2e-out/
+/splat-api-data/
+
+# Model weights and large binaries. `default_negative_prompt.pt` is the one
+# weight the image needs at runtime (model_training/utils/train_utils.py:482
+# uses it as the default negative-prompt path), so it is re-included; the
+# negation must stay after the pattern it overrides.
+*.pt
+!default_negative_prompt.pt
+*.ckpt
+*.pth
+*.h5
+*.hdf5
+*.ply
+*.spz
+*.npy
+*.npz
+*.mp4
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Local state that must never be copied into an image
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.sqlite3-journal
+.env
+.env.*
+!.env.example
+docker-compose.override.yml
+docker-compose.override.yaml
