@@ -1,0 +1,17 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# HTTP-layer dependencies only. The pipeline stack (torch, threedgrut, diffusers,
+# transformers, MoGe) comes from the ArtiFixer base image; pinning it here would
+# risk overwriting a carefully built CUDA environment.
+
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.30
+pydantic>=2.7,<3.0
+python-multipart>=0.0.9
+plyfile>=1.0
+prometheus-client>=0.20
+
+# Test-only, kept here so the container can run its own suite.
+pytest>=8.0
+httpx>=0.27

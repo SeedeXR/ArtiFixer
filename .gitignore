@@ -228,3 +228,69 @@ slurm-logs/
 *.out
 *.err
 *.png
+
+# ---------------------------------------------------------------------------
+# splat_api service (COLMAP -> Gaussian splat HTTP API)
+# ---------------------------------------------------------------------------
+# The service keeps all of its state under SPLAT_API_DATA_ROOT, which defaults
+# to /data/splat-api, outside the working tree. The patterns below cover the
+# case where a developer points it (or the e2e tool's --data-root) at a path
+# inside the repo, plus the artifacts those runs produce.
+
+# Service data roots and scratch output
+/data/
+/splat-api-data/
+splat_api/data/
+splat_api/**/data/
+/e2e-out/
+
+# Job store (SQLite, plus its write-ahead log and shared-memory sidecars)
+*.sqlite3
+*.sqlite3-shm
+*.sqlite3-wal
+*.sqlite3-journal
+
+# Model weights and checkpoints. These are gigabytes each and belong in a
+# volume or object store, never in git. `default_negative_prompt.pt` is the one
+# weight this repo intentionally tracks, so it is re-included explicitly.
+*.pt
+!/default_negative_prompt.pt
+*.ckpt
+*.pth
+
+# Pipeline inputs and outputs: COLMAP sparse models (cameras/images/points3D),
+# HDF5 caption and reconstruction files, Gaussian splats, renders and preview
+# videos, and uploaded or exported scene archives. Every test fixture of these
+# kinds is generated at runtime into a temp directory, so none needs tracking.
+*.bin
+*.h5
+*.hdf5
+*.ply
+*.spz
+*.npy
+*.npz
+*.mp4
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+
+# Local configuration and secrets. `.env` is covered above; these are the
+# variants people reach for next. Commit a redacted `.env.example` if useful.
+.env.*
+!.env.example
+docker-compose.override.yml
+docker-compose.override.yaml
+
+# OS and editor cruft
+.DS_Store
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+.idea/

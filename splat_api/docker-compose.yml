@@ -1,0 +1,67 @@
+# SPDX-FileCopyrightText: Copyright (c) 2026 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Single-node deployment.
+#
+#   docker build -f Dockerfile.cuda12 -t artifixer:cuda12 .
+#   SPLAT_API_KEYS='ci:<32+ char secret>:read+write' docker compose -f splat_api/docker-compose.yml up
+#
+# The service is HTTP-only by design; terminate TLS in front of it (see
+# docs/SECURITY.md).
+
+services:
+  splat-api:
+    build:
+      context: ..
+      dockerfile: splat_api/Dockerfile
+      args:
+        BASE_IMAGE: ${ARTIFIXER_BASE_IMAGE:-artifixer:cuda12}
+    image: splat-api:latest
+    # Bind to loopback by default: publishing an unauthenticated GPU service on
+    # 0.0.0.0 should never be the accidental outcome of `compose up`.
+    ports:
+      - "${SPLAT_API_BIND:-127.0.0.1}:8000:8000"
+    environment:
+      SPLAT_API_KEYS: ${SPLAT_API_KEYS:?set SPLAT_API_KEYS='id:secret:scopes' (secret >= 24 chars)}
+      SPLAT_API_AUTO_DOWNLOAD: ${SPLAT_API_AUTO_DOWNLOAD:-0}
+      SPLAT_API_CHECKPOINT_VARIANT: ${SPLAT_API_CHECKPOINT_VARIANT:-1.3b}
+      SPLAT_API_MAX_CONCURRENT_JOBS: ${SPLAT_API_MAX_CONCURRENT_JOBS:-1}
+      SPLAT_API_LOG_LEVEL: ${SPLAT_API_LOG_LEVEL:-INFO}
+      SPLAT_API_RATE_LIMIT_PER_MINUTE: ${SPLAT_API_RATE_LIMIT_PER_MINUTE:-120}
+      SPLAT_API_TRUSTED_HOSTS: ${SPLAT_API_TRUSTED_HOSTS:-*}
+      HF_TOKEN: ${HF_TOKEN:-}
+    volumes:
+      - splat-data:/data/splat-api
+      - checkpoints:/data/artifixer-checkpoints
+      - hf-cache:/data/hf-cache
+    # 3DGRUT and the diffusion pipeline use shared memory heavily for dataloader
+    # workers; the 64 MB default causes bus errors under load.
+    shm_size: "16gb"
+    ipc: host
+    init: true
+    read_only: true
+    tmpfs:
+      # Slang/torch JIT caches and matplotlib config need a writable scratch area
+      # even though the application itself writes only to its data volume.
+      - /tmp:size=8g,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: ${SPLAT_API_GPU_COUNT:-1}
+              capabilities: [gpu]
+
+volumes:
+  splat-data:
+  checkpoints:
+  hf-cache:
